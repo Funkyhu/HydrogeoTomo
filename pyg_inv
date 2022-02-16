@@ -1,0 +1,90 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Jun  8 21:55:26 2020
+
+@ author: Quan Liu, modified by Linwei Hu
+"""
+
+################################### import packages ##########################################
+import matplotlib as mpl
+import numpy as np
+
+import pygimli as pg
+from pygimli.physics.traveltime import TravelTimeManager
+
+mpl.rcParams['image.cmap'] = 'inferno_r'
+
+
+
+################################### parameter table ##########################################
+lamda = [1, 2, 5, 10, 20, 50, 100, 200]    # smoothing factor
+f = 201811                                 # snapshot/pumping tests campaign
+t_d = 100                                  # traveltime diagnostics
+tA_inv = 2                                 # 1: traveltime   2: attenuation
+
+
+################################### model dimension ##########################################
+dx = 0.5
+dy = 0.5
+dz = 0.5
+x1 = -4.5
+x2 = 4
+y1 = -4.5
+y2 = 5
+z1 = 50.4
+z2 = 58.9
+
+
+################################### input file of traveltime #################################
+if tA_inv == 1:    
+   f0 = 'tt' + str(t_d) + '_' + str(f) + '_angle.sgt'
+elif tA_inv == 2:
+   f0 = 'A' + str(t_d) + '_' + str(f) + '_angle.sgt'
+   
+
+################################### inversion ################################################
+for i in lamda:
+    # create forward model and mesh
+    refinement = dx
+    x = np.arange(x1, x2+dx, dx)
+    y = np.arange(y1, y2+dy, dy)
+    z = np.arange(z1, z2+dz, dz)
+    mesh = pg.meshtools.createMesh3D(x,y,z)
+
+
+    # import measured travel time
+    data = pg.DataContainer(f0, 's g')
+    
+    
+    # inversion package and configuration
+    tt = TravelTimeManager()
+
+    tt.inv.inv.setRecalcJacobian(True)
+    invmodel = tt.invert(data, mesh=mesh, secNodes=1, lam=i, zWeight=1.0,
+                         useGradient=False, verbose=True)
+    print("chi^2 = %.5f" % tt.inv.chi2())
+
+    # visualize the result
+    pg.show(mesh, invmodel, label="Velocity (m/s)")
+    
+    # export the result
+    f1 = 'vel_lam' + str(i) + '_' + str(f) + '.txt'          
+    f2 = 'xyz.txt'
+    f3 = 'rays_lam' + str(i) + '_tt' + str(t_d), '_' + str(f) + '.txt'
+    if tA_inv == 1:
+        f4 = 'tt_sim_lam' + str(i) + '_tt' + str(t_d), '_' + str(f) + '.txt'  
+    elif tA_inv == 2:
+        f4 = 'A_sim_lam' + str(i) + '_tt' + str(t_d), '_' + str(f) + '.txt'
+            
+    
+    pg.utils.saveResult(f1, invmodel)
+    pg.utils.saveResult(f2, mesh.cellCenter())
+    pg.utils.saveResult(f3, tt.rayCoverage())
+    pg.utils.saveResult(f4, tt.inv.response)
+    
+
+
+
+
+
+
